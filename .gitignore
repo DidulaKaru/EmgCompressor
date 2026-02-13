@@ -1,0 +1,25 @@
+# Arduino IDE & Build Artifacts
+*.elf
+*.hex
+*.bin
+*.lock
+*.eep
+*.map
+build/
+.arduino15/
+arduino-cli.yaml
+
+# Visual Studio Code & PlatformIO (Highly likely you'll use these)
+.vscode/
+.pio/
+.pioenvs/
+lib/
+src/main.cpp # If you use PIO, we don't want local mains in the repo
+
+# ESP32 Specific
+sdkconfig
+sdkconfig.old
+
+# OS Junk
+.DS_Store
+Thumbs.db
