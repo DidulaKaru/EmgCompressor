@@ -24,3 +24,5 @@ void setup() {
   std::vector<uint8_t> compressed = codec.compress(data);
   // Send 'compressed' over Wi-Fi/ESP-NOW...
 }
+
+**If you stumble into this page for some reason, note that this project is still under construction. Please wait until we finish it**
