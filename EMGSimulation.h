@@ -18,6 +18,7 @@ inline double generateEMG(double time, double frequency = 5.0){
     double amplitude = sin(2 * M_PI * frequency * time); 
     double noise = ((double)rand()%200-100)/1000.0; //Random noise between -0.1 and 0.1
     return amplitude + noise;
+        spike = ((rand() % 500) / 1000.0) * contraction; // spike amplitude scales
 }
 
 //Maps the simulated EMG signal to a 16-bit ADC range (0 to 65535)
