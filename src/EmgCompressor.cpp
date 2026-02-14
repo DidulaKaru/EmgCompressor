@@ -1,26 +1,24 @@
 #include "EmgCompressor.h"
+#include <string.h> // For memset
 
-// Offset to handle negative deltas in array index (e.g., -50 becomes index 78)
-const int DELTA_OFFSET = 128; 
+// Arrays in C++ can't have negative indices. But since the EMG deltas might be negative, we'll add 128 to every value
+const int DELTA_OFFSET = 128;
+// We are limiting to only256 possible delta values. This is 1 byte, keeps the signal light 
 const int MAX_SYMBOLS = 256;
 
+//Constructor and Destructor (Empty for now, but we might need them later)
 EmgCompressor::EmgCompressor() {}
 EmgCompressor::~EmgCompressor() {}
 
-// -----------------------------------------------------------
-// HELPER: Delete Tree (Prevent Memory Leaks)
-// -----------------------------------------------------------
+// HELPER FUNCTION: Delete Tree (Prevent Memory Leaks)
 void EmgCompressor::deleteTree(HuffmanNode* root) {
-    if (root == NULL) return;
-    deleteTree(root->left);
-    deleteTree(root->right);
+    if (root == NULL) return; // Stop if we hit a dead end
+    deleteTree(root->left); // recursively clean the left side
+    deleteTree(root->right); // recursively clelan the right side
     delete root;
 }
 
-// -----------------------------------------------------------
-// HELPER: Recursive Code Generator
-// Traverses tree to assign "0" for left and "1" for right
-// -----------------------------------------------------------
+// HELPER FUNCTION: Recursive Code Generator
 void EmgCompressor::generateCodes(HuffmanNode* root, std::string currentCode, std::string* codeTable) {
     if (root == NULL) return;
 
@@ -36,13 +34,12 @@ void EmgCompressor::generateCodes(HuffmanNode* root, std::string currentCode, st
     generateCodes(root->right, currentCode + "1", codeTable);
 }
 
-// -----------------------------------------------------------
 // CORE ALGORITHM: Build Huffman Tree (O(N^2) Array Method)
-// -----------------------------------------------------------
+// This is where the magic happens bro
 HuffmanNode* EmgCompressor::buildTreeFromFrequencies(int* frequencies) {
     std::vector<HuffmanNode*> nodes;
 
-    // 1. Create Leaf Nodes
+    // 1. Create Nodes for each symbol with non-zero frequency
     for (int i = 0; i < MAX_SYMBOLS; i++) {
         if (frequencies[i] > 0) {
             nodes.push_back(new HuffmanNode(i - DELTA_OFFSET, frequencies[i]));
@@ -96,9 +93,7 @@ HuffmanNode* EmgCompressor::buildTreeFromFrequencies(int* frequencies) {
     return nodes[0]; // The Root
 }
 
-// -----------------------------------------------------------
-// MAIN: COMPRESS
-// -----------------------------------------------------------
+// MAIN: Compress Function. This is what we call from the code outside
 std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     std::vector<uint8_t> output;
     if (input.empty()) return output;
@@ -106,19 +101,40 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     // STEP 1: Delta Encoding
     std::vector<int> deltas;
     deltas.reserve(input.size());
-    deltas.push_back(input[0]); // First value is absolute
+    deltas.push_back(input[0]); // First value is absolute.
     for (size_t i = 1; i < input.size(); i++) {
-        int diff = input[i] - input[i-1];
+        int diff = input[i] - input[i-1]; // Take the difference
         // Clamp to prevent crash if noise is huge (optional safety)
         if (diff > 127) diff = 127;
         if (diff < -128) diff = -128;
         deltas.push_back(diff);
     }
 
-    // STEP 2: Count Frequencies
+    // STEP 2: Count Frequencies & Normalize
     int frequencies[MAX_SYMBOLS] = {0};
+    int maxFreq = 0;
+
+    // A. Count
     for (int d : deltas) {
-        frequencies[d + DELTA_OFFSET]++;
+        int idx = d + DELTA_OFFSET;
+        frequencies[idx]++;
+        if (frequencies[idx] > maxFreq) maxFreq = frequencies[idx];
+    }
+
+    // B. Normalize (Scale down to 0-255 if needed)
+    if (maxFreq > 255) {
+        for (int i = 0; i < MAX_SYMBOLS; i++) {
+            if (frequencies[i] > 0) {
+                // Scale math: (Value * 255) / Max
+                // We use 'long' cast to prevent overflow during multiplication
+                int scaled = (int)((long)frequencies[i] * 255 / maxFreq);
+                
+                // Safety: Ensure rare symbols don't become 0 (which would delete them)
+                if (scaled == 0) scaled = 1; 
+                
+                frequencies[i] = scaled;
+            }
+        }
     }
 
     // STEP 3: Build Tree & Codes
@@ -126,23 +142,22 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     std::string codeTable[MAX_SYMBOLS];
     generateCodes(root, "", codeTable);
 
-    // STEP 4: Write Header (So Decompressor knows the Tree)
-    // Format: [NumSymbols] -> Pairs of [Value, Frequency]
+    // STEP 4: Write Header so that decompression can rebuild the same tree
     int uniqueSymbols = 0;
     for(int i=0; i<MAX_SYMBOLS; i++) if(frequencies[i] > 0) uniqueSymbols++;
     
     output.push_back((uint8_t)uniqueSymbols);
+
     for(int i=0; i<MAX_SYMBOLS; i++) {
         if(frequencies[i] > 0) {
-            output.push_back((uint8_t)i); // The symbol index (0-255)
-            // Clamp frequency to 255 to fit in 1 byte (Loss of efficiency, not data)
-            int f = frequencies[i];
-            if (f > 255) f = 255; 
-            output.push_back((uint8_t)f);
+            output.push_back((uint8_t)i); // The symbol index
+            
+            // No clamping needed anymore! Step 2 handled it safely.
+            output.push_back((uint8_t)frequencies[i]); 
         }
     }
     
-    // Also save original size (2 bytes) to know when to stop
+    // Write original count (2 bytes)
     uint16_t count = (uint16_t)input.size();
     output.push_back((uint8_t)(count >> 8));
     output.push_back((uint8_t)(count & 0xFF));
@@ -176,9 +191,8 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     return output;
 }
 
-// -----------------------------------------------------------
-// MAIN: DECOMPRESS
-// -----------------------------------------------------------
+// MAIN: Decompress Function
+
 std::vector<int> EmgCompressor::decompress(const std::vector<uint8_t>& input) {
     std::vector<int> output;
     if (input.empty()) return output;
