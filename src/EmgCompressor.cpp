@@ -1,10 +1,10 @@
 #include "EmgCompressor.h"
-#include <string.h> // For memset
+#include <queue>
 
-// Arrays in C++ can't have negative indices. But since the EMG deltas might be negative, we'll add 128 to every value
-const int DELTA_OFFSET = 128;
-// We are limiting to only256 possible delta values. This is 1 byte, keeps the signal light 
-const int MAX_SYMBOLS = 256;
+// Arrays in C++ can't have negative indices. But since the EMG deltas might be negative, we'll add an offset.
+const int DELTA_OFFSET = 32768;
+// 16-bit delta symbols (-32768 to 32767)
+const int MAX_SYMBOLS = 65536;
 
 //Constructor and Destructor (Empty for now, but we might need them later)
 EmgCompressor::EmgCompressor() {}
@@ -19,12 +19,12 @@ void EmgCompressor::deleteTree(HuffmanNode* root) {
 }
 
 // HELPER FUNCTION: Recursive Code Generator
-void EmgCompressor::generateCodes(HuffmanNode* root, std::string currentCode, std::string* codeTable) {
+void EmgCompressor::generateCodes(HuffmanNode* root, const std::string& currentCode, std::vector<std::string>& codeTable) {
     if (root == NULL) return;
 
     // If leaf node, store the code
     if (!root->left && !root->right) {
-        if (root->value >= -128 && root->value <= 127) {
+        if (root->value >= -32768 && root->value <= 32767) {
             codeTable[root->value + DELTA_OFFSET] = currentCode;
         }
         return;
@@ -34,85 +34,63 @@ void EmgCompressor::generateCodes(HuffmanNode* root, std::string currentCode, st
     generateCodes(root->right, currentCode + "1", codeTable);
 }
 
-// CORE ALGORITHM: Build Huffman Tree (O(N^2) Array Method)
-// This is where the magic happens bro
-HuffmanNode* EmgCompressor::buildTreeFromFrequencies(int* frequencies) {
-    std::vector<HuffmanNode*> nodes;
+// CORE ALGORITHM: Build Huffman Tree (Min-Heap)
+struct NodeCompare {
+    bool operator()(const HuffmanNode* a, const HuffmanNode* b) const {
+        return a->freq > b->freq;
+    }
+};
 
-    // 1. Create Nodes for each symbol with non-zero frequency
+HuffmanNode* EmgCompressor::buildTreeFromFrequencies(const std::vector<uint32_t>& frequencies) {
+    std::priority_queue<HuffmanNode*, std::vector<HuffmanNode*>, NodeCompare> heap;
+
     for (int i = 0; i < MAX_SYMBOLS; i++) {
         if (frequencies[i] > 0) {
-            nodes.push_back(new HuffmanNode(i - DELTA_OFFSET, frequencies[i]));
+            heap.push(new HuffmanNode(i - DELTA_OFFSET, frequencies[i]));
         }
     }
 
-    // Edge case: Empty data
-    if (nodes.empty()) return NULL;
-    
-    // Edge case: Only 1 symbol (e.g., all zeros)
-    // We add a dummy node to make the tree logic work
-    if (nodes.size() == 1) {
-        nodes.push_back(new HuffmanNode(0, 0)); 
+    if (heap.empty()) return NULL;
+
+    if (heap.size() == 1) {
+        heap.push(new HuffmanNode(0, 0));
     }
 
-    // 2. Build Tree by merging smallest nodes
-    while (nodes.size() > 1) {
-        int min1 = -1, min2 = -1;
+    while (heap.size() > 1) {
+        HuffmanNode* left = heap.top();
+        heap.pop();
+        HuffmanNode* right = heap.top();
+        heap.pop();
 
-        // Find smallest and second smallest
-        for (size_t i = 0; i < nodes.size(); i++) {
-            if (min1 == -1 || nodes[i]->freq < nodes[min1]->freq) {
-                min2 = min1;
-                min1 = i;
-            } else if (min2 == -1 || nodes[i]->freq < nodes[min2]->freq) {
-                min2 = i;
-            }
-        }
-
-        // Merge them
-        HuffmanNode* left = nodes[min1];
-        HuffmanNode* right = nodes[min2];
-        
         HuffmanNode* parent = new HuffmanNode(0, left->freq + right->freq);
         parent->left = left;
         parent->right = right;
-
-        // Remove old nodes from list and add parent
-        // (Swap-and-pop is faster, but order matters for determinism, 
-        // so we just erase carefully. Since N is small (<50), erase is fine).
-        if (min1 > min2) { // Erase larger index first to avoid shifting
-            nodes.erase(nodes.begin() + min1);
-            nodes.erase(nodes.begin() + min2);
-        } else {
-            nodes.erase(nodes.begin() + min2);
-            nodes.erase(nodes.begin() + min1);
-        }
-        nodes.push_back(parent);
+        heap.push(parent);
     }
 
-    return nodes[0]; // The Root
+    return heap.top();
 }
 
 // MAIN: Compress Function. This is what we call from the code outside
 std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     std::vector<uint8_t> output;
     if (input.empty()) return output;
+    if (input.size() > 0xFFFFFFFFu) return output;
 
     // STEP 1: Delta Encoding
     std::vector<int> deltas;
-    deltas.reserve(input.size());
-    deltas.push_back(input[0]); // First value is absolute.
+    deltas.reserve(input.size() - 1);
     for (size_t i = 1; i < input.size(); i++) {
         int diff = input[i] - input[i-1]; // Take the difference
-        // Clamp to prevent crash if noise is huge (optional safety)
-        if (diff > 127) diff = 127;
-        if (diff < -128) diff = -128;
+        // Clamp to 16-bit delta range
+        if (diff > 32767) diff = 32767;
+        if (diff < -32768) diff = -32768;
         deltas.push_back(diff);
     }
 
     // STEP 2: Count Frequencies & Normalize
-    int frequencies[MAX_SYMBOLS] = {0};
-    int maxFreq = 0;
+    std::vector<uint32_t> frequencies(MAX_SYMBOLS, 0);
+    uint32_t maxFreq = 0;
 
     // A. Count
     for (int d : deltas) {
@@ -122,12 +100,10 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     }
 
     // B. Normalize (Scale down to 0-255 if needed)
-    if (maxFreq > 255) {
+    if (maxFreq > 65535) {
         for (int i = 0; i < MAX_SYMBOLS; i++) {
             if (frequencies[i] > 0) {
-                // Scale math: (Value * 255) / Max
-                // We use 'long' cast to prevent overflow during multiplication
-                int scaled = (int)((long)frequencies[i] * 255 / maxFreq);
+                uint32_t scaled = static_cast<uint32_t>((static_cast<uint64_t>(frequencies[i]) * 65535) / maxFreq);
                 
                 // Safety: Ensure rare symbols don't become 0 (which would delete them)
                 if (scaled == 0) scaled = 1; 
@@ -138,29 +114,46 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     }
 
     // STEP 3: Build Tree & Codes
-    HuffmanNode* root = buildTreeFromFrequencies(frequencies);
-    std::string codeTable[MAX_SYMBOLS];
-    generateCodes(root, "", codeTable);
+    HuffmanNode* root = NULL;
+    std::vector<std::string> codeTable(MAX_SYMBOLS);
+    if (!deltas.empty()) {
+        root = buildTreeFromFrequencies(frequencies);
+        generateCodes(root, "", codeTable);
+    }
 
     // STEP 4: Write Header so that decompression can rebuild the same tree
-    int uniqueSymbols = 0;
-    for(int i=0; i<MAX_SYMBOLS; i++) if(frequencies[i] > 0) uniqueSymbols++;
+    uint32_t uniqueSymbols = 0;
+    for (int i = 0; i < MAX_SYMBOLS; i++) if (frequencies[i] > 0) uniqueSymbols++;
     
-    output.push_back((uint8_t)uniqueSymbols);
+    output.push_back((uint8_t)((uniqueSymbols >> 24) & 0xFF));
+    output.push_back((uint8_t)((uniqueSymbols >> 16) & 0xFF));
+    output.push_back((uint8_t)((uniqueSymbols >> 8) & 0xFF));
+    output.push_back((uint8_t)(uniqueSymbols & 0xFF));
 
-    for(int i=0; i<MAX_SYMBOLS; i++) {
-        if(frequencies[i] > 0) {
-            output.push_back((uint8_t)i); // The symbol index
-            
-            // No clamping needed anymore! Step 2 handled it safely.
-            output.push_back((uint8_t)frequencies[i]); 
+    for (int i = 0; i < MAX_SYMBOLS; i++) {
+        if (frequencies[i] > 0) {
+            uint16_t symbolIndex = static_cast<uint16_t>(i);
+            uint16_t symbolFreq = static_cast<uint16_t>(frequencies[i]);
+            output.push_back((uint8_t)((symbolIndex >> 8) & 0xFF));
+            output.push_back((uint8_t)(symbolIndex & 0xFF));
+            output.push_back((uint8_t)((symbolFreq >> 8) & 0xFF));
+            output.push_back((uint8_t)(symbolFreq & 0xFF));
         }
     }
     
-    // Write original count (2 bytes)
-    uint16_t count = (uint16_t)input.size();
-    output.push_back((uint8_t)(count >> 8));
+    // Write original count (4 bytes)
+    uint32_t count = (uint32_t)input.size();
+    output.push_back((uint8_t)((count >> 24) & 0xFF));
+    output.push_back((uint8_t)((count >> 16) & 0xFF));
+    output.push_back((uint8_t)((count >> 8) & 0xFF));
     output.push_back((uint8_t)(count & 0xFF));
+
+    // Write initial sample (4 bytes)
+    int32_t firstSample = static_cast<int32_t>(input[0]);
+    output.push_back((uint8_t)((firstSample >> 24) & 0xFF));
+    output.push_back((uint8_t)((firstSample >> 16) & 0xFF));
+    output.push_back((uint8_t)((firstSample >> 8) & 0xFF));
+    output.push_back((uint8_t)(firstSample & 0xFF));
 
     // STEP 5: Bit Packing (The actual Compression)
     uint8_t currentByte = 0;
@@ -187,7 +180,7 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
         output.push_back(currentByte);
     }
 
-    deleteTree(root);
+    if (root != NULL) deleteTree(root);
     return output;
 }
 
@@ -200,25 +193,58 @@ std::vector<int> EmgCompressor::decompress(const std::vector<uint8_t>& input) {
     size_t cursor = 0;
 
     // STEP 1: Read Header & Rebuild Tree
-    int uniqueSymbols = input[cursor++];
-    int frequencies[MAX_SYMBOLS] = {0};
+    if (input.size() < 4) return output;
+    uint32_t uniqueSymbols = (static_cast<uint32_t>(input[cursor]) << 24) |
+                             (static_cast<uint32_t>(input[cursor + 1]) << 16) |
+                             (static_cast<uint32_t>(input[cursor + 2]) << 8) |
+                             (static_cast<uint32_t>(input[cursor + 3]));
+    cursor += 4;
+    if (uniqueSymbols > static_cast<uint32_t>(MAX_SYMBOLS)) return output;
 
-    for(int i=0; i<uniqueSymbols; i++) {
-        uint8_t symbolIndex = input[cursor++];
-        uint8_t symbolFreq = input[cursor++];
+    std::vector<uint32_t> frequencies(MAX_SYMBOLS, 0);
+
+    if (input.size() < cursor + static_cast<size_t>(uniqueSymbols) * 4 + 8) return output;
+
+    for (uint32_t i = 0; i < uniqueSymbols; i++) {
+        uint16_t symbolIndex = (static_cast<uint16_t>(input[cursor]) << 8) |
+                               static_cast<uint16_t>(input[cursor + 1]);
+        uint16_t symbolFreq = (static_cast<uint16_t>(input[cursor + 2]) << 8) |
+                              static_cast<uint16_t>(input[cursor + 3]);
+        cursor += 4;
+        if (symbolIndex >= MAX_SYMBOLS) return output;
         frequencies[symbolIndex] = symbolFreq;
     }
 
-    // Read Original Item Count (2 bytes)
-    uint16_t originalCount = (input[cursor] << 8) | input[cursor+1];
-    cursor += 2;
+    // Read Original Item Count (4 bytes)
+    uint32_t originalCount = (static_cast<uint32_t>(input[cursor]) << 24) |
+                             (static_cast<uint32_t>(input[cursor + 1]) << 16) |
+                             (static_cast<uint32_t>(input[cursor + 2]) << 8) |
+                             (static_cast<uint32_t>(input[cursor + 3]));
+    cursor += 4;
+
+    // Read initial sample (4 bytes)
+    int32_t firstSample = (static_cast<int32_t>(input[cursor]) << 24) |
+                          (static_cast<int32_t>(input[cursor + 1]) << 16) |
+                          (static_cast<int32_t>(input[cursor + 2]) << 8) |
+                          (static_cast<int32_t>(input[cursor + 3]));
+    cursor += 4;
+
+    if (originalCount == 0) return output;
+
+    if (uniqueSymbols == 0) {
+        if (originalCount == 1) {
+            output.push_back(static_cast<int>(firstSample));
+        }
+        return output;
+    }
 
     HuffmanNode* root = buildTreeFromFrequencies(frequencies);
+    if (root == NULL) return output;
     HuffmanNode* current = root;
 
     // STEP 2: Traverse Tree using Bits
     std::vector<int> deltas;
-    while (deltas.size() < originalCount && cursor < input.size()) {
+    while (deltas.size() < (originalCount - 1) && cursor < input.size()) {
         uint8_t byte = input[cursor++];
         
         for (int i = 0; i < 8; i++) {
@@ -228,24 +254,27 @@ std::vector<int> EmgCompressor::decompress(const std::vector<uint8_t>& input) {
             if (isSet) current = current->right;
             else       current = current->left;
 
+            if (current == NULL) {
+                deleteTree(root);
+                return output;
+            }
+
             // Found a leaf?
             if (!current->left && !current->right) {
                 deltas.push_back(current->value);
                 current = root; // Reset to top
                 
-                if (deltas.size() == originalCount) break;
+                if (deltas.size() == (originalCount - 1)) break;
             }
         }
     }
 
     // STEP 3: Reverse Delta Encoding (Prefix Sum)
-    if (!deltas.empty()) {
-        int val = deltas[0];
+    output.push_back(static_cast<int>(firstSample));
+    int val = static_cast<int>(firstSample);
+    for (size_t i = 0; i < deltas.size(); i++) {
+        val = val + deltas[i];
         output.push_back(val);
-        for(size_t i=1; i<deltas.size(); i++) {
-            val = val + deltas[i];
-            output.push_back(val);
-        }
     }
 
     deleteTree(root);

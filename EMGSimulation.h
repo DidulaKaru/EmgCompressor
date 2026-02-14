@@ -6,11 +6,9 @@
 #include <cmath> //for sin() and M_PI
 #include <ctime> //for time() to seed random number generator
 
-using namespace std;
-
 // Initializes the random number generator with the current time as the seed
 inline void initRandom(){
-    srand(time(0));
+    std::srand(static_cast<unsigned int>(std::time(NULL)));
 }
 
 //Generates a simulated EMG signal based on a sine wave with added random noise
@@ -21,7 +19,7 @@ inline double getEMGSample(double time) {
     // Example: periodic contraction every 2 seconds for 0.5s
     double period = 2.0;      // contraction every 2s
     double duration = 0.5;    // contraction lasts 0.5s
-    double t_mod = fmod(time, period);
+    double t_mod = std::fmod(time, period);
 
     if(t_mod < duration) {
         contraction = 1.0;    // full contraction
@@ -30,13 +28,13 @@ inline double getEMGSample(double time) {
     }
 
     // Base EMG jitter
-    double baseline = (rand() % 200 - 100) / 1000.0;  // small noise
+    double baseline = (std::rand() % 200 - 100) / 1000.0;  // small noise
 
     // Random spike probability increases with contraction
     double spike = 0.0;
     int threshold = static_cast<int>(1000 * contraction);  // more spikes in contraction
-    if ((rand() % 1000) < threshold) {
-        spike = ((rand() % 500) / 1000.0) * contraction; // spike amplitude scales
+    if ((std::rand() % 1000) < threshold) {
+        spike = ((std::rand() % 500) / 1000.0) * contraction; // spike amplitude scales
     }
 
     return baseline + spike;

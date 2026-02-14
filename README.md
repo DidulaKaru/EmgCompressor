@@ -2,7 +2,6 @@
 
 A lightweight C++ library for lossless compression of Myoelectric (EMG) sensor data. Designed for ESP32-based robotic arms to minimize wireless transmission latency.
 
-**If you stumble into this page for some reason, note that this project is still under construction. Please wait until we finish it**
 
 ## Features
 * **Delta Encoding:** Exploits the continuous nature of bio-signals.
