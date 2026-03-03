@@ -26,4 +26,25 @@ void setup() {
   // Send 'compressed' over Wi-Fi/ESP-NOW...
 }
 
+void loop() {}
+```
+
+## Console demo (dummy data)
+This repository includes a native console demo that generates synthetic EMG samples,
+compresses them, decompresses them, and validates round-trip accuracy.
+
+Build and run from the repository root:
+
+```bash
+g++ -std=c++17 extras/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o extras/ConsoleDemo/emg_demo
+./extras/ConsoleDemo/emg_demo
+```
+
+On Windows (PowerShell):
+
+```powershell
+g++ -std=c++17 extras/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o extras/ConsoleDemo/emg_demo.exe
+.\extras\ConsoleDemo\emg_demo.exe
+```
+
 
