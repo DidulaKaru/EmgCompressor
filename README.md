@@ -36,15 +36,15 @@ compresses them, decompresses them, and validates round-trip accuracy.
 Build and run from the repository root:
 
 ```bash
-g++ -std=c++17 extras/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o extras/ConsoleDemo/emg_demo
-./extras/ConsoleDemo/emg_demo
+g++ -std=c++17 testing/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o testing/ConsoleDemo/emg_demo
+./testing/ConsoleDemo/emg_demo
 ```
 
 On Windows (PowerShell):
 
 ```powershell
-g++ -std=c++17 extras/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o extras/ConsoleDemo/emg_demo.exe
-.\extras\ConsoleDemo\emg_demo.exe
+g++ -std=c++17 testing/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o testing/ConsoleDemo/emg_demo.exe
+.\testing\ConsoleDemo\emg_demo.exe
 ```
 
 

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include "EMGSimulation.h"  
+#include "../../EMGSimulation.h"
 
 using namespace std;
 
