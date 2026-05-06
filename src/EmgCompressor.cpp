@@ -6,13 +6,12 @@ const int DELTA_OFFSET = 32768;
 // 16-bit delta symbols (-32768 to 32767)
 const int MAX_SYMBOLS = 65536;
 
-//Constructor and Destructor (Empty for now, but we might need them later)
 EmgCompressor::EmgCompressor() {}
 EmgCompressor::~EmgCompressor() {}
 
 // HELPER FUNCTION: Delete Tree (Prevent Memory Leaks)
 void EmgCompressor::deleteTree(HuffmanNode* root) {
-    if (root == NULL) return; // Stop if we hit a dead end
+    if (root == nullptr) return; // Stop if we hit a dead end
     deleteTree(root->left); // recursively clean the left side
     deleteTree(root->right); // recursively clelan the right side
     delete root;
@@ -20,7 +19,7 @@ void EmgCompressor::deleteTree(HuffmanNode* root) {
 
 // HELPER FUNCTION: Recursive Code Generator
 void EmgCompressor::generateCodes(HuffmanNode* root, const std::string& currentCode, std::vector<std::string>& codeTable) {
-    if (root == NULL) return;
+    if (root == nullptr) return;
 
     // If leaf node, store the code
     if (!root->left && !root->right) {
@@ -50,7 +49,7 @@ HuffmanNode* EmgCompressor::buildTreeFromFrequencies(const std::vector<uint32_t>
         }
     }
 
-    if (heap.empty()) return NULL;
+    if (heap.empty()) return nullptr;
 
     if (heap.size() == 1) {
         heap.push(new HuffmanNode(0, 0));
@@ -114,7 +113,7 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
     }
 
     // STEP 3: Build Tree & Codes
-    HuffmanNode* root = NULL;
+    HuffmanNode* root = nullptr;
     std::vector<std::string> codeTable(MAX_SYMBOLS);
     if (!deltas.empty()) {
         root = buildTreeFromFrequencies(frequencies);
@@ -180,7 +179,7 @@ std::vector<uint8_t> EmgCompressor::compress(const std::vector<int>& input) {
         output.push_back(currentByte);
     }
 
-    if (root != NULL) deleteTree(root);
+    if (root != nullptr) deleteTree(root);
     return output;
 }
 
@@ -239,7 +238,7 @@ std::vector<int> EmgCompressor::decompress(const std::vector<uint8_t>& input) {
     }
 
     HuffmanNode* root = buildTreeFromFrequencies(frequencies);
-    if (root == NULL) return output;
+    if (root == nullptr) return output;
     HuffmanNode* current = root;
 
     // STEP 2: Traverse Tree using Bits
@@ -254,7 +253,7 @@ std::vector<int> EmgCompressor::decompress(const std::vector<uint8_t>& input) {
             if (isSet) current = current->right;
             else       current = current->left;
 
-            if (current == NULL) {
+            if (current == nullptr) {
                 deleteTree(root);
                 return output;
             }

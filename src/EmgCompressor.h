@@ -1,19 +1,19 @@
 #ifndef EMG_COMPRESSOR_H // Prevents the code from breaking if the library is included twice
 #define EMG_COMPRESSOR_H
 
-#include <vector> // We'll use vectors rather than arrays because vectors can grow them dynamically
-#include <string> // For std::string
-#include <cstdint> // For fixed-width integer types
-#include <cstddef> // For size_t and NULL
+#include <vector> 
+#include <string> 
+#include <cstdint> 
+#include <cstddef> 
 
 struct HuffmanNode {
-    int value; //The actual data          
-    uint32_t freq;  //The frequency of the data           
-    HuffmanNode *left; // if you go left, you add 0
-    HuffmanNode *right; // if you go right, you add 1
+    int value;          
+    uint32_t freq;             
+    HuffmanNode *left; 
+    HuffmanNode *right; 
     
     // Constructor for the HuffmanNode struct
-    HuffmanNode(int v, uint32_t f) : value(v), freq(f), left(NULL), right(NULL) {}
+    HuffmanNode(int v, uint32_t f) : value(v), freq(f), left(nullptr), right(nullptr) {}
 };
 
 class EmgCompressor {
@@ -28,7 +28,6 @@ class EmgCompressor {
         HuffmanNode* buildTreeFromFrequencies(const std::vector<uint32_t>& frequencies);
 
     public:
-        // This shit is the API (Application Programming Interface)
         EmgCompressor();
         ~EmgCompressor();
 

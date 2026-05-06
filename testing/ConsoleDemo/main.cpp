@@ -1,9 +1,3 @@
-/*
-  Console demo: generate EMG samples, compress, decompress, and verify round-trip.
-  Build example (from repo root):
-  g++ -std=c++17 testing/ConsoleDemo/main.cpp src/EmgCompressor.cpp -o testing/ConsoleDemo/emg_demo
-*/
-
 #include <algorithm>
 #include <iostream>
 #include <vector>
