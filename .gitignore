@@ -9,12 +9,12 @@ build/
 .arduino15/
 arduino-cli.yaml
 
-# Visual Studio Code & PlatformIO (Highly likely you'll use these)
+# Visual Studio Code & PlatformIO
 .vscode/
 .pio/
 .pioenvs/
 lib/
-src/main.cpp # If you use PIO, we don't want local mains in the repo
+src/main.cpp
 
 # ESP32 Specific
 sdkconfig

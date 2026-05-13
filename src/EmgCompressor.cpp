@@ -4,10 +4,6 @@
 const int DELTA_OFFSET = 32768;
 const int MAX_SYMBOLS = 65536;
 
-EmgCompressor::EmgCompressor() {}
-EmgCompressor::~EmgCompressor() {}
-
-
 void EmgCompressor::deleteTree(HuffmanNode* root) {
     if (root == nullptr) return; 
     deleteTree(root->left); 
@@ -18,7 +14,6 @@ void EmgCompressor::deleteTree(HuffmanNode* root) {
 void EmgCompressor::generateCodes(HuffmanNode* root, const std::string& currentCode, std::vector<std::string>& codeTable) {
     if (root == nullptr) return;
 
-    // If leaf node, store the code
     if (!root->left && !root->right) {
         if (root->value >= -32768 && root->value <= 32767) {
             codeTable[root->value + DELTA_OFFSET] = currentCode;
