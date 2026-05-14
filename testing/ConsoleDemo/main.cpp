@@ -130,7 +130,7 @@ bool extractFrequenciesFromCompressed(
 
   return true;
 }
-}  // namespace
+} 
 
 int main() {
   initRandom();
@@ -182,11 +182,11 @@ int main() {
   std::cout << "Restored samples: " << restored.size() << "\n";
   std::cout << "Mismatches: " << mismatches << "\n";
 
-  size_t rawBytes = samples.size() * sizeof(int);
+  /*size_t rawBytes = samples.size() * sizeof(int);
   if (rawBytes > 0) {
     double ratio = static_cast<double>(compressed.size()) / static_cast<double>(rawBytes);
     std::cout << "Compression ratio (compressed/raw): " << ratio << "\n";
   }
-
+  */
   return 0;
 }

@@ -4,6 +4,9 @@
 const int DELTA_OFFSET = 32768;
 const int MAX_SYMBOLS = 65536;
 
+EmgCompressor::EmgCompressor() {}
+EmgCompressor::~EmgCompressor() {}
+
 void EmgCompressor::deleteTree(HuffmanNode* root) {
     if (root == nullptr) return; 
     deleteTree(root->left); 
