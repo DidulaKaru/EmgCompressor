@@ -11,14 +11,14 @@ int main() {
     const int numSamples = 1000;
 
     ofstream file("emg_samples1.csv");
-    file << "time,sample\n";
+    file << "time,adc\n";
 
     double t = 0.0;
     double dt = 1.0 / sampleRate;
 
     for(int i = 0; i < numSamples; ++i) {
-        double sample = getEMGSample(t);
-        file << t << "," << sample << "\n";
+        int adc = maptoADC(getEMGSample(t));
+        file << t << "," << adc << "\n";
         t += dt;
     }
 
